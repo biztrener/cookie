@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Печенье с предсказанием</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{min-height:100%;background:#f5ece0;}
+body{font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem;}
+
+.page{
+  width:100%;max-width:560px;
+  background:#f5ece0;
+  border-radius:20px;
+  position:relative;overflow:hidden;
+  padding:3rem 2rem 3.5rem;
+  box-shadow:0 8px 40px rgba(100,60,0,0.12);
+}
+canvas.bg-cv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+canvas.conf-cv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:20;}
+
+.content{position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;gap:0;}
+
+.title{
+  font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:600;
+  color:#3a2010;margin-bottom:6px;text-align:center;letter-spacing:0.03em;
+}
+.subtitle{
+  font-size:12px;color:#a07848;text-align:center;
+  letter-spacing:0.13em;text-transform:uppercase;margin-bottom:3rem;
+}
+
+/* INTRO */
+.intro{display:flex;flex-direction:column;align-items:center;gap:2rem;}
+.crack-btn{
+  background:#3a2010;color:#f5ece0;border:none;
+  padding:15px 44px;border-radius:999px;font-size:16px;font-weight:500;
+  cursor:pointer;letter-spacing:0.04em;font-family:'Inter',sans-serif;
+  transition:background 0.15s,transform 0.1s;
+  box-shadow:0 4px 16px rgba(58,32,16,0.35);
+  touch-action:manipulation;
+}
+.crack-btn:hover{background:#5a3418;}
+.crack-btn:active{transform:scale(0.96);}
+
+/* RESULT */
+.result-zone{display:none;flex-direction:column;align-items:center;gap:2rem;width:100%;}
+.result-zone.show{display:flex;animation:fadeUp 0.5s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+.halves{display:flex;justify-content:center;align-items:center;gap:6px;height:150px;}
+
+.paper-wrap{
+  width:100%;position:relative;background:#fffdf5;border-radius:5px;
+  padding:2.25rem 2.5rem 2rem;
+  box-shadow:0 3px 0 #c8a050,0 8px 28px rgba(100,60,0,0.13);
+}
+.paper-wrap::before{
+  content:'';position:absolute;top:10px;left:10px;right:10px;bottom:10px;
+  border:1.5px dashed #d4a840;border-radius:3px;pointer-events:none;
+}
+.paper-icon{font-size:32px;display:block;text-align:center;margin-bottom:1rem;}
+.fortune-text{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;line-height:1.8;
+  color:#1e0e00;font-style:italic;font-weight:600;
+  text-align:center;position:relative;z-index:1;
+}
+.divider-line{width:64px;height:1px;background:#d4a840;margin:1.4rem auto;opacity:0.6;}
+.lucky-line{
+  font-size:14px;color:#8a6028;letter-spacing:0.04em;
+  text-align:center;position:relative;z-index:1;
+  font-weight:500;font-family:'Inter',sans-serif;
+}
+
+.again-btn{
+  background:transparent;border:1.5px solid #c8a050;color:#7a4e18;
+  padding:13px 34px;border-radius:999px;font-size:15px;font-weight:500;
+  cursor:pointer;transition:all 0.15s;letter-spacing:0.03em;
+  font-family:'Inter',sans-serif;touch-action:manipulation;
+}
+.again-btn:hover{background:#3a2010;color:#f5ece0;border-color:#3a2010;}
+.again-btn:active{transform:scale(0.96);}
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <canvas class="bg-cv" id="bg-cv"></canvas>
+  <canvas class="conf-cv" id="conf-cv"></canvas>
+
+  <div class="content">
+    <div class="title">Печенье с предсказанием</div>
+    <div class="subtitle">Твоё послание на эту неделю</div>
+
+    <div class="intro" id="intro">
+      <canvas id="whole-cv" width="200" height="200" style="display:block;filter:drop-shadow(0 8px 20px rgba(100,50,0,0.25));cursor:pointer;" onclick="smash()"></canvas>
+      <button class="crack-btn" onclick="smash()">🥠 Сломать печенье</button>
+    </div>
+
+    <div class="result-zone" id="result">
+      <div class="halves">
+        <canvas id="hl-cv" width="110" height="140" style="display:block;"></canvas>
+        <canvas id="hr-cv" width="110" height="140" style="display:block;"></canvas>
+      </div>
+      <div class="paper-wrap">
+        <span class="paper-icon">🥠</span>
+        <div class="fortune-text" id="ft"></div>
+        <div class="divider-line"></div>
+        <div class="lucky-line" id="lt"></div>
+      </div>
+      <button class="again-btn" onclick="reset()">Сломать ещё одно</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const F=[
+  {t:"Сегодня клиенты сами ищут тебя — просто возьми трубку и выслушай. Первая сделка создана ещё до обеда.",l:"✦ Счастливое время: первые два часа рабочего дня"},
+  {t:"Твои диалоги на этой неделе открывают двери, которые давно были закрыты. Активация ближе, чем кажется.",l:"✦ Счастливое число: 3 диалога до первой активации"},
+  {t:"Клиент, который долго думал, сегодня готов. Один диалог — и сделка создана. Не откладывай.",l:"✦ Счастливый день для активаций: сегодня"},
+  {t:"Твоя уверенность сегодня заразительна. Клиенты чувствуют: с тобой всё получится. Смелее!",l:"✦ Счастливый совет: начни с самого сложного"},
+  {t:"Неделя принесёт тебе лояльных клиентов и лёгкие диалоги. Сделки создаются сами — ты просто в потоке.",l:"✦ Счастливое число активаций: больше, чем на прошлой неделе"},
+  {t:"Один диалог сегодня изменит всю статистику недели. Ты не знаешь, какой именно — поэтому проведи их все.",l:"✦ Счастливый момент: после обеда"},
+  {t:"Клиент, которому ты помог — уже рассказал о тебе другу. Жди тёплого входящего. Звёзды не врут.",l:"✦ Счастливый канал: входящие обращения"},
+  {t:"Твоя энергия сегодня на пике. Используй её на сложные диалоги — они закроются легче, чем ты думаешь.",l:"✦ Счастливый совет: не откладывай трудный разговор"},
+  {t:"Активация сегодня — это не просто платёж. Это человек, который выдохнул и сделал первый шаг к свободе. Ты помог.",l:"✦ Счастливая мысль: ты меняешь жизни"},
+  {t:"Сделки не ждут идеального момента. Идеальный момент — это когда ты берёшь и делаешь. Именно сейчас.",l:"✦ Счастливое действие: следующий диалог"},
+  {t:"Сегодня твоё слово весит больше обычного. Клиенты слышат не только то, что ты говоришь, но и как. Говори уверенно.",l:"✦ Счастливая фраза: «Вы сделали правильный шаг»"},
+  {t:"Три активации на этой неделе уже предрешены. Осталось только провести нужные диалоги. Вселенная за тебя.",l:"✦ Счастливое число: 3"},
+  {t:"Препятствия на этой неделе — это просто вопросы, на которые у тебя уже есть ответы. Доверяй себе.",l:"✦ Счастливый совет: подготовь три ответа на возражения"},
+  {t:"Лучший день для создания сделок — сегодня. Второй лучший день — тоже сегодня. Действуй.",l:"✦ Счастливый час: ближайший"},
+  {t:"Клиент, который молчит — думает. Клиент, который думает — почти готов. Один мягкий вопрос решит всё.",l:"✦ Счастливый вопрос: «Что вас останавливает?»"},
+  {t:"Твои результаты этой недели удивят даже тебя. Просто продолжай делать то, что делаешь — и немного больше.",l:"✦ Счастливое настроение: уверенность без суеты"},
+  {t:"Каждый диалог — это вклад. Сегодняшние посевы дадут активации раньше, чем ты ожидаешь.",l:"✦ Счастливый принцип: качество каждого касания"},
+  {t:"Удача любит подготовленных. Ты готов. Осталось только начать — и неделя сложится именно так, как нужно.",l:"✦ Счастливый ритуал: первый диалог сразу после планёрки"},
+  {t:"Сегодня ты превратишь «я подумаю» в «отправьте ссылку». Это не магия — это ты в своей лучшей форме.",l:"✦ Счастливая фраза: «Давайте я объясню следующий шаг»"},
+  {t:"Твой самый лояльный клиент этой недели ещё не знает о тебе. Но уже совсем скоро — узнает.",l:"✦ Счастливый источник: неожиданный входящий"},
+  {t:"Небольшая пауза в диалоге — это не неловкость. Это момент, когда клиент принимает решение. Не заполняй её.",l:"✦ Счастливая техника: молчание после предложения"},
+  {t:"Сегодня ты поможешь кому-то начать жизнь заново. Они ещё не знают, что напишут именно тебе.",l:"✦ Счастливая мысль: каждый диалог важен"},
+  {t:"Возражение — это не отказ, это запрос на больше информации. У тебя она есть. Отвечай спокойно.",l:"✦ Счастливый подход: возражение = интерес"},
+  {t:"Твой план на этой неделе не просто выполнится — он перевыполнится. Это будет твоя лучшая неделя.",l:"✦ Счастливое число: на одну активацию больше плана"},
+  {t:"Один честный диалог стоит десяти формальных. Будь собой — и клиенты это почувствуют.",l:"✦ Счастливый стиль: искренность"},
+  {t:"Сделка, которую ты уже почти списал — ещё не закрыта. Один диалог может изменить всё.",l:"✦ Счастливое действие: вернись к отложенному"},
+  {t:"Твоя команда сегодня заряжается от тебя. Даже если ты этого не замечаешь — они замечают.",l:"✦ Счастливый эффект: ты вдохновляешь других"},
+  {t:"Клиент чувствует, когда ты веришь в то, что предлагаешь. Сегодня эта вера особенно сильна.",l:"✦ Счастливое качество: убеждённость"},
+  {t:"Сложный клиент сегодня — это благодарный клиент завтра. Не сдавайся раньше времени.",l:"✦ Счастливая установка: трудно сейчас — легко потом"},
+  {t:"Этот день создан для активаций. Первый платёж клиента — это его первый шаг к свободе. Помоги ему его сделать.",l:"✦ Счастливый момент: каждый диалог сегодня"},
+  {t:"Ты уже знаешь всё необходимое для закрытия сделки. Осталось только довериться себе и сделать шаг.",l:"✦ Счастливый совет: действуй из уверенности"},
+  {t:"Сегодня количество перейдёт в качество. Каждый диалог приближает тебя к той самой активации.",l:"✦ Счастливое число диалогов: столько, сколько успеешь"},
+  {t:"Лучшее, что ты можешь сделать для клиента — это написать ему сегодня, а не завтра.",l:"✦ Счастливое правило: не откладывай"},
+  {t:"Твоя уверенность — это не поза, это результат опыта. Клиенты чувствуют разницу. Ты — профессионал.",l:"✦ Счастливое слово: профессионал"},
+  {t:"Когда клиент говорит «дорого» — он говорит «объясни мне ценность». У тебя есть, что сказать.",l:"✦ Счастливый ответ: объясни, что он получает"},
+  {t:"Первый платёж клиента — это его доверие к тебе. Это дороже любой цифры в отчёте. Береги его.",l:"✦ Счастливая ценность: доверие"},
+  {t:"Сделка создаётся не в момент согласия, а в момент, когда клиент почувствовал, что его поняли.",l:"✦ Счастливый навык: умение слышать"},
+  {t:"Ты помогаешь людям в один из самых сложных моментов их жизни. Это не просто работа — это призвание.",l:"✦ Счастливая мысль: твоя работа важна"},
+  {t:"Клиент, который сомневается — ещё не отказал. Один правильный вопрос изменит всё.",l:"✦ Счастливый вопрос: «Что важно именно для вас?»"},
+  {t:"Неделя только начинается, а план уже смотрит на тебя с интересом. Покажи ему, кто здесь главный.",l:"✦ Счастливое настроение: азарт без суеты"},
+  {t:"Каждая активация — это начало пути клиента к финансовой свободе. И ты — тот, кто открыл эту дверь.",l:"✦ Счастливая награда: результат, который виден"},
+  {t:"Сегодня не нужно быть идеальным. Нужно быть настоящим. Клиенты выбирают людей, а не скрипты.",l:"✦ Счастливое качество: искренность в каждом слове"},
+  {t:"Сегодня звёзды выстроились так, что каждый твой диалог — это потенциальная активация. Пользуйся.",l:"✦ Счастливый день: именно сегодня"},
+  {t:"Твой самый результативный диалог этой недели ещё впереди. Не останавливайся.",l:"✦ Счастливый ориентир: следующий разговор"},
+  {t:"Уверенность не означает отсутствие сомнений. Она означает, что ты действуешь несмотря на них.",l:"✦ Счастливая сила: действие несмотря ни на что"},
+];
+
+let last=-1;
+function pick(){let i;do{i=Math.floor(Math.random()*F.length);}while(i===last&&F.length>1);last=i;return F[i];}
+
+function cookieGradient(ctx,cx,cy,r,highlight){
+  const g=ctx.createRadialGradient(cx-r*0.25,cy-r*0.25,0,cx,cy,r*1.1);
+  g.addColorStop(0,'#f8c84a');
+  g.addColorStop(0.42,'#e09820');
+  g.addColorStop(1,'#7a3e06');
+  return g;
+}
+
+function drawWhole(){
+  const cv=document.getElementById('whole-cv');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,r=W*0.44;
+  ctx.clearRect(0,0,W,H);
+
+  // Base
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.fillStyle=cookieGradient(ctx,cx,cy,r);ctx.fill();
+
+  // Shine
+  const shine=ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,0,cx-r*0.1,cy-r*0.1,r*0.8);
+  shine.addColorStop(0,'rgba(255,251,232,0.6)');shine.addColorStop(1,'rgba(255,251,232,0)');
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=shine;ctx.fill();
+
+  // Edge shadow
+  const edge=ctx.createRadialGradient(cx,cy,r*0.55,cx,cy,r);
+  edge.addColorStop(0,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(0,0,0,0.3)');
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=edge;ctx.fill();
+
+  // Wave pattern
+  ctx.beginPath();
+  const y0=cy;
+  ctx.moveTo(cx-r*0.7,y0);
+  for(let i=0;i<=8;i++){
+    const x=cx-r*0.7+i*r*0.175;
+    const yy=y0+(i%2===0?-r*0.08:r*0.08);
+    ctx.lineTo(x,yy);
+  }
+  ctx.strokeStyle='rgba(160,100,10,0.5)';ctx.lineWidth=1.8;ctx.stroke();
+
+  // Dots
+  [[cx-r*0.45,cy-r*0.35],[cx+r*0.45,cy-r*0.35],[cx-r*0.38,cy+r*0.38],[cx+r*0.38,cy+r*0.38],[cx,cy-r*0.55]].forEach(([x,y])=>{
+    ctx.beginPath();ctx.arc(x,y,2.8,0,Math.PI*2);ctx.fillStyle='rgba(140,80,10,0.28)';ctx.fill();
+  });
+
+  // Paper strip
+  const pw=r*0.35,ph=r*0.28,px=cx-pw/2,py=cy+r-4;
+  ctx.fillStyle='#fffdf5';
+  ctx.beginPath();ctx.roundRect(px,py,pw,ph,2);ctx.fill();
+  for(let i=0;i<3;i++){
+    ctx.beginPath();ctx.moveTo(px+4,py+5+i*7);ctx.lineTo(px+pw-4,py+5+i*7);
+    ctx.strokeStyle='rgba(212,168,64,0.55)';ctx.lineWidth=0.8;ctx.stroke();
+  }
+}
+
+function drawHalf(canvasId,side){
+  const cv=document.getElementById(canvasId);
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  const r=H*0.46;
+  const anchorX=side==='left'?W:0;
+  const anchorY=H*0.46;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(anchorX,anchorY,r, side==='left'?Math.PI*0.5:Math.PI*1.5, side==='left'?Math.PI*1.5:Math.PI*0.5, false);
+  ctx.closePath();
+
+  const gcx=side==='left'?W*0.35:W*0.65;
+  const g=ctx.createRadialGradient(gcx,H*0.3,0,W*0.5,H*0.5,W*0.9);
+  g.addColorStop(0,'#f8c84a');g.addColorStop(0.42,'#e09820');g.addColorStop(1,'#7a3e06');
+  ctx.fillStyle=g;ctx.fill();
+
+  // Shine
+  const sh=ctx.createRadialGradient(
+    side==='left'?W*0.25:W*0.75,H*0.25,0,
+    side==='left'?W*0.25:W*0.75,H*0.25,W*0.7
+  );
+  sh.addColorStop(0,'rgba(255,251,232,0.55)');sh.addColorStop(1,'rgba(255,251,232,0)');
+  ctx.beginPath();
+  ctx.arc(anchorX,anchorY,r,side==='left'?Math.PI*0.5:Math.PI*1.5,side==='left'?Math.PI*1.5:Math.PI*0.5,false);
+  ctx.closePath();ctx.fillStyle=sh;ctx.fill();
+
+  // Edge shadow
+  const ed=ctx.createRadialGradient(W*0.5,H*0.5,r*0.5,W*0.5,H*0.5,r);
+  ed.addColorStop(0,'rgba(0,0,0,0)');ed.addColorStop(1,'rgba(0,0,0,0.28)');
+  ctx.beginPath();
+  ctx.arc(anchorX,anchorY,r,side==='left'?Math.PI*0.5:Math.PI*1.5,side==='left'?Math.PI*1.5:Math.PI*0.5,false);
+  ctx.closePath();ctx.fillStyle=ed;ctx.fill();
+  ctx.restore();
+
+  // Dots
+  const dx=side==='left'?W*0.28:W*0.72;
+  [[dx,H*0.32],[dx+(side==='left'?-12:12),H*0.58]].forEach(([x,y])=>{
+    ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fillStyle='rgba(140,80,10,0.28)';ctx.fill();
+  });
+
+  // Paper strip
+  const bx=side==='left'?W*0.42:W*0.08;
+  ctx.fillStyle='#fffdf5';
+  ctx.beginPath();ctx.roundRect(bx,H*0.78,W*0.45,H*0.16,2);ctx.fill();
+  for(let i=0;i<3;i++){
+    ctx.beginPath();ctx.moveTo(bx+3,H*(0.81+i*0.05));ctx.lineTo(bx+W*0.45-3,H*(0.81+i*0.05));
+    ctx.strokeStyle='rgba(212,168,64,0.55)';ctx.lineWidth=0.7;ctx.stroke();
+  }
+}
+
+function smash(){
+  drawHalf('hl-cv','left');
+  drawHalf('hr-cv','right');
+  document.getElementById('intro').style.display='none';
+  const r=document.getElementById('result');
+  r.classList.add('show');
+  animateHalves();
+  const f=pick();
+  document.getElementById('ft').textContent=f.t;
+  document.getElementById('lt').textContent=f.l;
+  doConfetti();
+}
+
+function animateHalves(){
+  ['hl-cv','hr-cv'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.style.transition='none';el.style.transform='none';
+    requestAnimationFrame(()=>{
+      el.style.transition='transform 0.55s cubic-bezier(.15,.8,.35,1)';
+      el.style.transformOrigin=i===0?'right center':'left center';
+      requestAnimationFrame(()=>{
+        el.style.transform=i===0?'rotate(-42deg) translate(-26px,10px)':'rotate(42deg) translate(26px,10px)';
+      });
+    });
+  });
+}
+
+function reset(){
+  ['hl-cv','hr-cv'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.style.transition='none';el.style.transform='none';
+  });
+  const r=document.getElementById('result');
+  r.classList.remove('show');r.style.display='none';
+  setTimeout(()=>{
+    r.style.display='';
+    document.getElementById('intro').style.cssText='display:flex;flex-direction:column;align-items:center;gap:2rem;';
+  },60);
+}
+
+function doConfetti(){
+  const cv=document.getElementById('conf-cv');
+  const pg=document.getElementById('page');
+  cv.width=pg.offsetWidth;cv.height=pg.offsetHeight;
+  const ctx=cv.getContext('2d');
+  const cols=['#f8c84a','#fef0c8','#e09820','#fffbe8','#d4af37','#f5deb3','#c8922a','#fff'];
+  const pts=Array.from({length:70},()=>({
+    x:cv.width/2+(Math.random()-.5)*100,y:cv.height*.4,
+    vx:(Math.random()-.5)*10,vy:-(Math.random()*8+3),
+    s:Math.random()*8+3,c:cols[Math.floor(Math.random()*cols.length)],
+    r:Math.random()*Math.PI*2,rv:(Math.random()-.5)*.26,a:1,
+    shape:Math.random()>.4?'rect':'circle'
+  }));
+  let fr=0;
+  (function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    pts.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;p.vy+=0.22;p.r+=p.rv;p.a-=0.013;
+      if(p.a<=0)return;
+      ctx.save();ctx.globalAlpha=p.a;ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;
+      if(p.shape==='circle'){ctx.beginPath();ctx.arc(0,0,p.s/2,0,Math.PI*2);ctx.fill();}
+      else ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s);
+      ctx.restore();
+    });
+    if(++fr<110)requestAnimationFrame(draw);
+    else ctx.clearRect(0,0,cv.width,cv.height);
+  })();
+}
+
+(function bgPattern(){
+  const cv=document.getElementById('bg-cv');
+  const pg=document.getElementById('page');
+  cv.width=pg.offsetWidth||560;cv.height=pg.offsetHeight||700;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const sp=64;
+  for(let x=sp/2;x<cv.width;x+=sp){
+    for(let y=sp/2;y<cv.height;y+=sp){
+      const off=(Math.floor(y/sp)%2)*sp/2;
+      const cx=x+off,cy=y;
+      ctx.beginPath();ctx.arc(cx,cy,7,0,Math.PI*2);
+      ctx.strokeStyle='rgba(180,120,50,0.09)';ctx.lineWidth=1;ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx-4,cy);
+      ctx.quadraticCurveTo(cx-1,cy-3,cx,cy);ctx.quadraticCurveTo(cx+1,cy+3,cx+4,cy);
+      ctx.strokeStyle='rgba(180,120,50,0.07)';ctx.lineWidth=0.8;ctx.stroke();
+    }
+  }
+  [[cv.width*.18,cv.height*.18,200,'rgba(240,180,60,0.1)'],
+   [cv.width*.82,cv.height*.8,240,'rgba(200,130,40,0.09)'],
+   [cv.width*.5,cv.height*.5,170,'rgba(255,210,100,0.07)']
+  ].forEach(([cx,cy,r,col])=>{
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+  });
+})();
+
+// Init
+drawWhole();
+document.getElementById('whole-cv').addEventListener('touchend',function(e){e.preventDefault();smash();});
+document.querySelectorAll('.crack-btn').forEach(b=>{
+  b.addEventListener('touchend',function(e){e.preventDefault();smash();});
+});
+document.querySelectorAll('.again-btn').forEach(b=>{
+  b.addEventListener('touchend',function(e){e.preventDefault();reset();});
+});
+</script>
+</body>
+</html>
